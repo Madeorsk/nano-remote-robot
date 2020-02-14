@@ -1,2 +1,2 @@
-# nano-remote-robot
+# nRemoteRobot (nRR)
 Minimalistic robots remote control server.
