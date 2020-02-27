@@ -1,6 +1,7 @@
 package com.madeorsk.nrr;
 
 import com.madeorsk.nrr.ws.WSClient;
+import com.madeorsk.nrr.ws.WSData;
 import com.madeorsk.nrr.ws.WSRouter;
 import io.undertow.Undertow;
 import io.undertow.server.HttpServerExchange;
@@ -10,6 +11,11 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import static io.undertow.Handlers.path;
 import static io.undertow.Handlers.websocket;
 
@@ -18,6 +24,66 @@ import static io.undertow.Handlers.websocket;
  */
 public class Server
 {
+	private static List<WSClient> robotsClients = new ArrayList<>();
+
+	/**
+	 * Initialize WebSocket router for nRR server.
+	 * @param router
+	 */
+	private static void initRouter(WSRouter router)
+	{
+		/*
+		 * Command so set robot mode (receive movements).
+		 */
+		router.addCommand(new WSRouter.Command("i am a robot")
+		{
+			@Override
+			public WSData on(WSClient client, JSONObject args)
+			{
+				robotsClients.add(client);
+				return null;
+			}
+		});
+
+		/*
+		 * Movements transmission when received by an emitter (any connected frontend).
+		 */
+		router.addCommand(new WSRouter.Command("translation")
+		{
+			@Override
+			public WSData on(WSClient client, JSONObject args)
+			{
+				Iterator<WSClient> it = robotsClients.iterator();
+				while (it.hasNext())
+				{ // Trying to transmit translation to every robot.
+					WSClient robot = it.next();
+					if (robot.isOpen()) // Robot client is open, transmitting.
+						robot.send(new WSData("translation", args));
+					else // Robot client is closed, remove from the list.
+						it.remove();
+				}
+				return null;
+			}
+		});
+		router.addCommand(new WSRouter.Command("rotation")
+		{
+			@Override
+			public WSData on(WSClient client, JSONObject args)
+			{
+				Iterator<WSClient> it = robotsClients.iterator();
+				while (it.hasNext())
+				{ // Trying to transmit rotation to every robot.
+					WSClient robot = it.next();
+					if (robot.isOpen()) // Robot client is open, transmitting.
+						robot.send(new WSData("rotation", args));
+					else // Robot client is closed, remove from the list.
+						it.remove();
+				}
+				return null;
+			}
+		});
+	}
+
 	/**
 	 * Main function.
 	 * @param args - Program arguments.
@@ -26,6 +92,7 @@ public class Server
 	{
 		// WebSocket router initialization (command handling).
 		WSRouter router = new WSRouter();
+		initRouter(router);
 
 		// Undertow web server setup.
 		Undertow server = Undertow.builder()
@@ -36,7 +103,24 @@ public class Server
 								// Websocket endpoint.
 								.addExactPath("/", websocket(
 										(webSocketHttpExchange, webSocketChannel) -> {
-											webSocketChannel.getReceiveSetter().set(new WSClient(router, webSocketHttpExchange, webSocketChannel));
+											// Only accept connection when authentication token is valid.
+											if (Utils.makeAuthenticationToken().equals(webSocketHttpExchange.getRequestHeader("Sec-WebSocket-Protocol")))
+											{ // Authentication token is valid.
+												// Setting WSClient receiver and start to receive messages.
+												webSocketChannel.getReceiveSetter().set(new WSClient(router, webSocketHttpExchange, webSocketChannel));
+												webSocketChannel.resumeReceives();
+											}
+											else
+											{ // Authentication token is invalid.
+												try
+												{ // Trying to close channel because of invalid authentication.
+													webSocketChannel.setCloseCode(4000);
+													webSocketChannel.setCloseReason("Invalid authentication token.");
+													webSocketChannel.sendClose();
+												} catch (IOException e)
+												{ // Is channel already closed?
+												}
+											}
 										})
 								)
 

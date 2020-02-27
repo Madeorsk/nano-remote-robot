@@ -58,7 +58,7 @@ public class WSClient extends AbstractReceiveListener
 			JSONObject args = (JSONObject) this.parser.parse(rawArgs);
 
 			if (this.router.hasCommand(commandName))
-				this.send(this.router.getCommand(commandName).on(args));
+				this.send(this.router.getCommand(commandName).on(this, args));
 			else
 			{ // Error: unknown command.
 				this.sendError("Unknown command.", "UnknownCommand");
@@ -68,6 +68,14 @@ public class WSClient extends AbstractReceiveListener
 		{ // Error: invalid command.
 			this.sendError("Invalid command.", "Protocol");
 		}
+	}
+
+	/**
+	 * @return `true` if the client is still connected, `false` otherwise.
+	 */
+	public boolean isOpen()
+	{
+		return this.channel.isOpen();
 	}
 
 	/**
@@ -116,5 +124,19 @@ public class WSClient extends AbstractReceiveListener
 	public void sendError()
 	{
 		this.sendError(null);
+	}
+
+	@Override
+	public boolean equals(Object o)
+	{
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		WSClient wsClient = (WSClient) o;
+		return this.hashCode() == wsClient.hashCode();
+	}
+	@Override
+	public int hashCode()
+	{
+		return this.channel.hashCode();
 	}
 }

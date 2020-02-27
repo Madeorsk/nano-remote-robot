@@ -27,7 +27,9 @@ public class ApplicationProperties
 		{ // Try to load application properties file.
 			appProperties.load(new FileInputStream("./app.properties"));
 		} catch (IOException e)
-		{}
+		{
+			System.err.println("Cannot load application properties.");
+		}
 	}
 
 	/**

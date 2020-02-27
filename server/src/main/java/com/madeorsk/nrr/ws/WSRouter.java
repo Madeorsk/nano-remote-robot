@@ -50,7 +50,7 @@ public class WSRouter
 	/**
 	 * Class of the command.
 	 */
-	public abstract class Command
+	public abstract static class Command
 	{
 		/**
 		 * Command name.
@@ -75,9 +75,10 @@ public class WSRouter
 
 		/**
 		 * Called when the command is executed.
+		 * @param client - Client who sent the command.
 		 * @param args - Arguments of the command (a JSON object).
 		 * @return The WSData of the response to send.
 		 */
-		public abstract WSData on(JSONObject args);
+		public abstract WSData on(WSClient client, JSONObject args);
 	}
 }
